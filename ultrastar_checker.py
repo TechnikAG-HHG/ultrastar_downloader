@@ -1,7 +1,22 @@
 import os
 import re
-import requests
+import yt_dlp
 from threading import Thread, Lock, Semaphore
+
+def is_youtube_video_available(link):
+    ydl_opts = {
+        'extract_flat': True,
+        'simulate': True,
+        'cachedir': False,
+        'quiet': True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.extract_info(link, download=False)
+        return True
+    except Exception as e:
+        print(f"Check failed for {link}: {e}")
+        return False
 
 def run_checker(FOLDER_PATH, number_of_threads=25):
     missing = []
@@ -14,9 +29,11 @@ def run_checker(FOLDER_PATH, number_of_threads=25):
             get_artist_from_file(FOLDER_PATH, filename, missing, lock)
 
     for filename in os.listdir(FOLDER_PATH):
-        thread = Thread(target=thread_target, args=(FOLDER_PATH, filename, missing, lock))
-        threads.append(thread)
-        thread.start()
+        # Only check .txt files, don't check subdirectories like NoYoutubeLink
+        if filename.endswith('.txt'):
+            thread = Thread(target=thread_target, args=(FOLDER_PATH, filename, missing, lock))
+            threads.append(thread)
+            thread.start()
 
     for thread in threads:
         thread.join()
@@ -62,17 +79,10 @@ def get_artist_from_file(FOLDER_PATH, filename, missing, lock):
                         
                     link = "https://www.youtube.com/watch?v=" + video_id
                     found_youtube = True
-                    try:
-                        r = requests.get(link, timeout=5)
-                        if r.status_code != 200 or "https://www.youtube.com/img/desktop/unavailable/" in r.text:
-                            print("ERROR: " + filename + ": YouTube video no longer exists!")
-                            with lock:
-                                if filename not in missing:
-                                    missing.append(filename)
-                        else:
-                            print(filename + ": found YouTube link: " + link)
-                    except Exception as e:
-                        print("ERROR: " + filename + ": exception checking YouTube link: " + str(e))
+                    if is_youtube_video_available(link):
+                        print(filename + ": found YouTube link: " + link)
+                    else:
+                        print("ERROR: " + filename + ": YouTube video no longer exists or is unavailable!")
                         with lock:
                             if filename not in missing:
                                 missing.append(filename)

@@ -3,11 +3,12 @@ import os
 import shutil
 import time
 import requests
-from threading import Thread, active_count
-from time import sleep
 import re
 import unicodedata
 import yt_dlp
+import imageio_ffmpeg
+from threading import Thread, active_count
+from time import sleep
 from PIL import Image
 from io import BytesIO
 
@@ -30,15 +31,18 @@ def safe_move(src, dst, max_retries=10, delay=5):
 def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id, audio_link):
     print("Downloading video!")
     print(link)
+    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
     try:
         # Step 1: Extract video info without downloading
         with yt_dlp.YoutubeDL({'cachedir': False}) as ydl:
             info_dict = ydl.extract_info(link, download=False)
-            title = replace_non_ascii(info_dict.get('title', 'video'))
+            
+            # Use the TXT file's base name as the safe_title to prevent naming collisions
+            txt_filename = os.path.basename(file_path)
+            txt_base = os.path.splitext(txt_filename)[0]
+            safe_title = replace_non_ascii(txt_base)
+            
             extension = 'mp4'
-            # Step 2: Remove special characters from title
-            safe_title = re.sub(r'[^\w\s-]', '', title).strip()
-            # Step 3: Define the desired filename
             desired_filename = f"{safe_title}.{extension}"
             desired_file_path = os.path.join(FOLDER_PATH, desired_filename)
 
@@ -48,6 +52,7 @@ def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id,
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
             'merge_output_format': 'mp4',
             'cachedir': False,
+            'ffmpeg_location': ffmpeg_path,
         }
 
         # Download the video with the desired filename
@@ -82,22 +87,24 @@ def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id,
             
     if audio_link != 1:
         try:
-            # Step 1: Extract video info without downloading
-            with yt_dlp.YoutubeDL({'cachedir': False}) as ydl:
-                info_dict = ydl.extract_info(audio_link, download=False)
-                extension_audio = 'mp3'
+            extension_audio = 'mp3'
+            desired_filename = f"{safe_title}.{extension_audio}"
+            desired_file_path = os.path.join(FOLDER_PATH, desired_filename)
 
-                desired_filename = f"{safe_title}.{extension_audio}"
-                desired_file_path = os.path.join(FOLDER_PATH, desired_filename)
-
-            # Step 4: Set ydl_opts with desired outtmpl
+            # Set ydl_opts to download best audio and convert to mp3 using FFmpeg
             ydl_opts = {
-                'outtmpl': desired_file_path,
-                'format': 'bestaudio',
+                'outtmpl': os.path.join(FOLDER_PATH, f"{safe_title}.%(ext)s"),
+                'format': 'bestaudio/best',
                 'cachedir': False,
+                'ffmpeg_location': ffmpeg_path,
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
             }
 
-            # Download the video with the desired filename
+            # Download and extract the audio with the desired filename
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([audio_link])
             print(f"Audio downloaded and saved as: {desired_filename}")
@@ -122,7 +129,6 @@ def delete_lines_with_prefix(file_path, prefix_list):
         for line in lines:
             if not any(line.startswith(prefix) for prefix in prefix_list):
                 file.write(line)
-    return
 
 processed_videos = set()
 lock = threading.Lock()
