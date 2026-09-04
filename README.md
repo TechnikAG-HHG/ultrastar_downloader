@@ -2,6 +2,22 @@
 
 A tool to download the song and image data to an UltraStar Deluxe text file.
 
+## Requirements
+
+- Python 3.10 or newer with Tk support
+- The packages listed in `requirements.txt`
+
+Install the packages with:
+
+```text
+python -m pip install -r requirements.txt
+```
+
+The requirements include yt-dlp's JavaScript challenge solver and Deno runtime,
+as well as a bundled FFmpeg executable. No separate FFmpeg or Deno installation
+is required. On Linux, install the distribution's Tk package if it is not already
+included (for example, `python3-tk`).
+
 # How to use
 
 1. Download UltraStar Deluxe text files from: https://usdb.animux.de/ or https://usdb.eu/ .
@@ -12,7 +28,7 @@ A tool to download the song and image data to an UltraStar Deluxe text file.
     - `Ultrastar Songs Output` contains the edited TXT files and downloaded video, audio, and cover files.
     - `Clean TXT Output` contains the original, unedited TXT files after successful processing.
 
-3. Run ultrastar_main.py, select your songs folder, and click **Refresh Songs** to verify detected .txt files.
+3. Run `ultrastar_main.py`, select the input, ready-output, and clean-TXT output folders, and click **Refresh Songs** to verify detected `.txt` files.
 
 4. For text files without a youtube link it searches for the right video. If the video is too long because it is a music video it uses the second result. Check these files because it can be that in the text files you have to set #GAP: to 0 or the video is just not right.
 

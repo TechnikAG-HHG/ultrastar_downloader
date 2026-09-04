@@ -1,4 +1,4 @@
-yt-dlp>=2026.8.19
+yt-dlp[default,deno]>=2026.8.19
 customtkinter
 requests
 imageio-ffmpeg

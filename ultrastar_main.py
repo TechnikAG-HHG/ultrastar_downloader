@@ -11,6 +11,9 @@ import sys
 import queue
 import re
 
+APPLICATION_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(APPLICATION_DIRECTORY, "config.txt")
+
 # Initialize thread-safe queue for UI console log redirection
 log_queue = queue.Queue()
 
@@ -43,9 +46,9 @@ def load_config():
         "READY_OUTPUT_DIRECTORY": "",
         "CLEAN_TXT_OUTPUT_DIRECTORY": "",
     }
-    if os.path.exists("config.txt"):
+    if os.path.exists(CONFIG_FILE):
         try:
-            with open("config.txt", "r", encoding='utf-8', errors='ignore') as f:
+            with open(CONFIG_FILE, "r", encoding='utf-8', errors='ignore') as f:
                 for line in f:
                     if "=" in line:
                         parts = line.strip().split("=", 1)
@@ -59,7 +62,7 @@ def load_config():
 
 def save_config(config):
     try:
-        with open("config.txt", "w", encoding='utf-8') as f:
+        with open(CONFIG_FILE, "w", encoding='utf-8') as f:
             for key, val in config.items():
                 f.write(f"{key}={val}\n")
     except Exception as e:
