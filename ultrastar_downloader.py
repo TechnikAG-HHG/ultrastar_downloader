@@ -12,6 +12,31 @@ from time import sleep
 from PIL import Image
 from io import BytesIO
 
+YTDLP_RETRY_OPTIONS = {
+    'cachedir': False,
+    'retries': 10,
+    'fragment_retries': 10,
+    'file_access_retries': 3,
+    'retry_sleep_functions': {'http': lambda attempt: min(attempt, 5)},
+}
+
+
+def download_with_format_fallback(link, ydl_opts, format_selectors):
+    last_error = None
+    for format_selector in format_selectors:
+        try:
+            current_opts = {**YTDLP_RETRY_OPTIONS, **ydl_opts, 'format': format_selector}
+            with yt_dlp.YoutubeDL(current_opts) as ydl:
+                ydl.download([link])
+            return
+        except yt_dlp.utils.DownloadError as error:
+            last_error = error
+            print(f"Download failed with format '{format_selector}', trying a fallback: {error}")
+
+    if last_error is not None:
+        raise last_error
+
+
 def safe_move(src, dst, max_retries=10, delay=5):
     for attempt in range(max_retries):
         try:
@@ -34,7 +59,7 @@ def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id,
     ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
     try:
         # Step 1: Extract video info without downloading
-        with yt_dlp.YoutubeDL({'cachedir': False}) as ydl:
+        with yt_dlp.YoutubeDL(YTDLP_RETRY_OPTIONS) as ydl:
             info_dict = ydl.extract_info(link, download=False)
             
             # Use the TXT file's base name as the safe_title to prevent naming collisions
@@ -49,15 +74,19 @@ def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id,
         # Step 4: Set ydl_opts with desired outtmpl
         ydl_opts = {
             'outtmpl': desired_file_path,
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
             'merge_output_format': 'mp4',
-            'cachedir': False,
             'ffmpeg_location': ffmpeg_path,
         }
 
         # Download the video with the desired filename
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([link])
+        download_with_format_fallback(
+            link,
+            ydl_opts,
+            (
+                'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'best[ext=mp4]/best',
+            ),
+        )
         print(f"Video downloaded and saved as: {desired_filename}")
     except Exception as e:
         print(f"Error downloading video: {e}")
@@ -94,8 +123,6 @@ def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id,
             # Set ydl_opts to download best audio and convert to mp3 using FFmpeg
             ydl_opts = {
                 'outtmpl': os.path.join(FOLDER_PATH, f"{safe_title}.%(ext)s"),
-                'format': 'bestaudio/best',
-                'cachedir': False,
                 'ffmpeg_location': ffmpeg_path,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
@@ -105,8 +132,7 @@ def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id,
             }
 
             # Download and extract the audio with the desired filename
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([audio_link])
+            download_with_format_fallback(audio_link, ydl_opts, ('bestaudio/best',))
             print(f"Audio downloaded and saved as: {desired_filename}")
         except Exception as e:
             print(f"Error downloading audio: {e}")
