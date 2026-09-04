@@ -91,6 +91,8 @@ def busy(madeprogress):
     if madeprogress is not None and progress < madeprogress:
         progress = madeprogress
     file_open_button.configure(state="disabled", fg_color="#313244", text_color="#7F849C")
+    refresh_folder_button.configure(state="disabled", fg_color="#313244", text_color="#7F849C")
+    thread_entry_label2.configure(state="disabled", fg_color="#313244", text_color="#7F849C")
     for button in buttons:
         button.configure(state="disabled", fg_color="#313244", text_color="#7F849C")
     root.update_idletasks()
@@ -99,6 +101,8 @@ def busy(madeprogress):
 
 def unbusy():
     file_open_button.configure(state="normal", fg_color="#89B4FA", text_color="#11111B")
+    refresh_folder_button.configure(state="normal", fg_color="#74C7EC", text_color="#11111B")
+    thread_entry_label2.configure(state="normal", fg_color="#45475A", text_color="#CDD6F4")
     
     # Re-enable specific buttons based on debug status
     if debug:
@@ -126,10 +130,15 @@ def refresh_search_results():
         search_results.configure(state="disabled")
         return
     try:
-        for file_name in os.listdir(FOLDER_PATH):
-            if file_name.endswith(".txt"):
-                search_results.insert(tk.END, f"{count + 1}# {file_name}\n")
-                count += 1
+        song_files = sorted(
+            [file_name for file_name in os.listdir(FOLDER_PATH) if file_name.lower().endswith(".txt")],
+            key=str.casefold
+        )
+        count = len(song_files)
+        if count > 0:
+            search_results.insert(tk.END, f"Found {count} song text file(s):\n\n")
+            for idx, file_name in enumerate(song_files, start=1):
+                search_results.insert(tk.END, f"{idx}# {file_name}\n")
         if count == 0:
             search_results.insert(tk.END, "No UltraStar .txt files found in this folder.")
     except Exception as e:
@@ -192,6 +201,7 @@ def programm():
         start_button_label.configure(fg_color="#F9E2AF", text="Run Checker")
         root.update_idletasks()
         start = 0
+        refresh_search_results()
 
 def programm1():
     refresh_search_results()
@@ -210,6 +220,7 @@ def programm1():
         start_button_label2.configure(fg_color="#A6E3A1", text="Add Youtube Links")
         root.update_idletasks()
         start = 0
+        refresh_search_results()
 
 def programm2():
     refresh_search_results()
@@ -230,6 +241,7 @@ def programm2():
         start_button_label3.configure(fg_color="#F38BA8", text="Download Videos and Images")
         root.update_idletasks()
         start = 0
+        refresh_search_results()
 
 def programmall():
     refresh_search_results()
@@ -265,6 +277,7 @@ def programmall():
         start_button_label_all.configure(text="Execute All Processes", fg_color="#FAB387")
         root.update_idletasks()
         unbusy()
+        refresh_search_results()
 
 # UI log polling function
 def update_logs():
@@ -379,6 +392,18 @@ file_open_button = ctk.CTkButton(
 )
 file_open_button.grid(row=0, column=0, sticky="ew", pady=(0, 8))
 
+refresh_folder_button = ctk.CTkButton(
+    dir_frame,
+    text="Refresh Songs",
+    command=refresh_search_results,
+    font=ctk.CTkFont(family="Inter", size=13, weight="bold"),
+    fg_color="#74C7EC",
+    text_color="#11111B",
+    hover_color="#89DCEB",
+    height=34
+)
+refresh_folder_button.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+
 path_label = ctk.CTkLabel(
     dir_frame, 
     text=name if name else "No folder selected", 
@@ -387,7 +412,7 @@ path_label = ctk.CTkLabel(
     wraplength=300, 
     anchor="w"
 )
-path_label.grid(row=1, column=0, sticky="ew", padx=5)
+path_label.grid(row=2, column=0, sticky="ew", padx=5)
 
 # Row 3: Thread Controller Frame
 thread_frame = ctk.CTkFrame(sidebar_frame, fg_color="transparent")
