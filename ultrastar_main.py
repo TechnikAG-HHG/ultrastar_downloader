@@ -66,9 +66,9 @@ def save_config(config):
 config = load_config()
 FOLDER_PATH = config.get("DEFAULT_DIRECTORY", "")
 if not FOLDER_PATH:
-    FOLDER_PATH = "C:/Texte"
+    FOLDER_PATH = os.path.expanduser("~/Texte")
 
-FOLDER_PATH2 = f"{FOLDER_PATH}/NoYoutubeLink"
+FOLDER_PATH2 = os.path.join(FOLDER_PATH, "NoYoutubeLink")
 name = config.get("DEFAULT_DIRECTORY", "")
 start = 0
 execute = 0
@@ -170,7 +170,7 @@ def callback():
             unbusy()
             path_label.configure(text=name)
             FOLDER_PATH = name
-            FOLDER_PATH2 = f"{name}/NoYoutubeLink"
+            FOLDER_PATH2 = os.path.join(name, "NoYoutubeLink")
             
             # Save updated directory to config
             cfg = load_config()
@@ -315,7 +315,19 @@ root.title("Ultrastar Deluxe Song Downloader")
 # Setup modern window frame (maximizing instead of borderless full-screen)
 root.geometry("1300x850")
 root.minsize(1024, 700)
-root.after(0, lambda: root.state('zoomed') if os.name == 'nt' else root.attributes('-zoomed', True))
+def maximize_window():
+    try:
+        if sys.platform.startswith("win"):
+            root.state("zoomed")
+        elif sys.platform == "darwin":
+            root.attributes("-fullscreen", True)
+            root.after(100, lambda: root.attributes("-fullscreen", False))
+        else:
+            root.attributes("-zoomed", True)
+    except Exception:
+        pass
+
+root.after(0, maximize_window)
 
 # Set columns and rows configuration for clean grid layout
 root.columnconfigure(0, weight=0, minsize=350)
