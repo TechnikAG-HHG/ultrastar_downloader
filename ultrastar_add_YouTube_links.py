@@ -170,7 +170,7 @@ def rename_file_and_add_line(video_id_part, file_path, filename, folder_path, co
         new_file.write(new_video_line + old_content)
 
     # Move file to the main folder if needed.
-    main_folder = folder_path.replace("NoYoutubeLink", "")
+    main_folder = os.path.dirname(os.path.normpath(folder_path))
     src = os.path.join(folder_path, filename)
     dst = os.path.join(main_folder, filename)
     try:
