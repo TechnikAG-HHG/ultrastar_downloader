@@ -53,7 +53,16 @@ def safe_move(src, dst, max_retries=10, delay=5):
     print(f"Failed to move file from {src} to {dst} after {max_retries} attempts")
     return False
 
-def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id, audio_link):
+def download_youtube_video(
+    link,
+    input_folder,
+    ready_output_folder,
+    clean_txt_output_folder,
+    file_path,
+    link_picture,
+    video_id,
+    audio_link,
+):
     print("Downloading video!")
     print(link)
     ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
@@ -69,7 +78,7 @@ def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id,
             
             extension = 'mp4'
             desired_filename = f"{safe_title}.{extension}"
-            desired_file_path = os.path.join(FOLDER_PATH, desired_filename)
+            desired_file_path = os.path.join(ready_output_folder, desired_filename)
 
         # Step 4: Set ydl_opts with desired outtmpl
         ydl_opts = {
@@ -104,25 +113,25 @@ def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id,
             response = requests.get(link_picture, headers=headers)
             if response.status_code == 200:
                 image_filename = f"{safe_title}.jpg"
-                with open(os.path.join(FOLDER_PATH, image_filename), 'wb') as file:
+                with open(os.path.join(ready_output_folder, image_filename), 'wb') as file:
                     file.write(response.content)
                 print("Image downloaded successfully as", image_filename)
             else:
-                get_youtube_thumbnail(safe_title, info_dict, FOLDER_PATH)
+                get_youtube_thumbnail(safe_title, info_dict, ready_output_folder)
         except Exception as e:
-            get_youtube_thumbnail(safe_title, info_dict, FOLDER_PATH)
+            get_youtube_thumbnail(safe_title, info_dict, ready_output_folder)
     else:
-        get_youtube_thumbnail(safe_title, info_dict, FOLDER_PATH)
+        get_youtube_thumbnail(safe_title, info_dict, ready_output_folder)
             
     if audio_link != 1:
         try:
             extension_audio = 'mp3'
             desired_filename = f"{safe_title}.{extension_audio}"
-            desired_file_path = os.path.join(FOLDER_PATH, desired_filename)
+            desired_file_path = os.path.join(ready_output_folder, desired_filename)
 
             # Set ydl_opts to download best audio and convert to mp3 using FFmpeg
             ydl_opts = {
-                'outtmpl': os.path.join(FOLDER_PATH, f"{safe_title}.%(ext)s"),
+                'outtmpl': os.path.join(ready_output_folder, f"{safe_title}.%(ext)s"),
                 'ffmpeg_location': ffmpeg_path,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
@@ -142,7 +151,14 @@ def download_youtube_video(link, FOLDER_PATH, file_path, link_picture, video_id,
     else:
         extension_audio = extension
 
-    rename_file_and_add_line(safe_title, file_path, FOLDER_PATH, extension, extension_audio)
+    rename_file_and_add_line(
+        safe_title,
+        file_path,
+        ready_output_folder,
+        clean_txt_output_folder,
+        extension,
+        extension_audio,
+    )
     with lock:
         processed_videos.discard(video_id)
         print(f"Removed video {video_id} from processed_videos set")
@@ -159,10 +175,13 @@ def delete_lines_with_prefix(file_path, prefix_list):
 processed_videos = set()
 lock = threading.Lock()
 
-def get_title_artist_from_file(FOLDER_PATH, prefix_list):
-    for filename in os.listdir(FOLDER_PATH):
+def get_title_artist_from_file(input_folder, ready_output_folder, clean_txt_output_folder, prefix_list):
+    os.makedirs(ready_output_folder, exist_ok=True)
+    os.makedirs(clean_txt_output_folder, exist_ok=True)
+
+    for filename in os.listdir(input_folder):
         if filename.endswith('.txt'):
-            file_path = os.path.join(FOLDER_PATH, filename)
+            file_path = os.path.join(input_folder, filename)
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
                 lines = file.readlines()
             for line in lines:
@@ -211,25 +230,53 @@ def get_title_artist_from_file(FOLDER_PATH, prefix_list):
                         else:
                             processed_videos.add(video_id)
 
-                    delete_lines_with_prefix(file_path, prefix_list)
-
                     while active_count() > int(number_of_threads):
                         sleep(0.01)
-                    x = Thread(target=download_youtube_video, args=(link, FOLDER_PATH, file_path, link_picture, video_id, audio_link), daemon=True)
+                    x = Thread(
+                        target=download_youtube_video,
+                        args=(
+                            link,
+                            input_folder,
+                            ready_output_folder,
+                            clean_txt_output_folder,
+                            file_path,
+                            link_picture,
+                            video_id,
+                            audio_link,
+                        ),
+                        daemon=True,
+                    )
                     print(f"Link Picture: {link_picture}")
                     x.start()
 
-def rename_file_and_add_line(title, file_path, FOLDER_PATH, extension, extension_audio):
+def rename_file_and_add_line(
+    title,
+    file_path,
+    ready_output_folder,
+    clean_txt_output_folder,
+    extension,
+    extension_audio,
+):
     print("Changing file")
+    os.makedirs(ready_output_folder, exist_ok=True)
+    os.makedirs(clean_txt_output_folder, exist_ok=True)
     with open(file_path, 'r', encoding='utf-8', errors='ignore') as old_file:
-        old_content = old_file.read()
-    with open(file_path, 'w', encoding='utf-8') as new_file:
+        old_lines = old_file.readlines()
+
+    output_file_path = os.path.join(ready_output_folder, os.path.basename(file_path))
+    with open(output_file_path, 'w', encoding='utf-8') as new_file:
         new_file.write(
             "#VIDEO:" + title + f".{extension}" + '\n' +
             "#MP3:" + title + f".{extension_audio}" + '\n' +
-            "#COVER:" + title + ".jpg" + '\n' +
-            old_content
+            "#COVER:" + title + ".jpg" + '\n'
         )
+        for line in old_lines:
+            if not line.startswith(('#VIDEO:', '#MP3:', '#COVER:')):
+                new_file.write(line)
+
+    clean_file_path = os.path.join(clean_txt_output_folder, os.path.basename(file_path))
+    os.replace(file_path, clean_file_path)
+    print(f"Moved original TXT to clean output: {clean_file_path}")
 
 def replace_non_ascii(text):
     text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
@@ -237,10 +284,21 @@ def replace_non_ascii(text):
     text = text.replace(' ', '_')
     return text
 
-def run_ultrastar_downloader(FOLDER_PATH, prefix_list, number_of_threads2):
+def run_ultrastar_downloader(
+    input_folder,
+    ready_output_folder,
+    clean_txt_output_folder,
+    prefix_list,
+    number_of_threads2,
+):
     global number_of_threads
     number_of_threads = number_of_threads2
-    get_title_artist_from_file(FOLDER_PATH, prefix_list)
+    get_title_artist_from_file(
+        input_folder,
+        ready_output_folder,
+        clean_txt_output_folder,
+        prefix_list,
+    )
     
 def get_youtube_thumbnail(safe_title, info_dict, FOLDER_PATH):
     # Use yt thumbnail if no custom image is provided

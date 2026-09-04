@@ -3,7 +3,7 @@ from ultrastar_downloader import run_ultrastar_downloader
 from ultrastar_checker import run_checker
 from ultrastar_add_YouTube_links import add_youtube_links
 import tkinter as tk
-from tkinter import filedialog as fd
+from tkinter import filedialog as fd, messagebox
 import os
 from threading import Thread, active_count as threading_active_count
 from time import sleep
@@ -38,7 +38,10 @@ def load_config():
     config = {
         "DEBUG": "False",
         "DEFAULT_THREADS": "10",
-        "DEFAULT_DIRECTORY": ""
+        "DEFAULT_DIRECTORY": "",
+        "INPUT_DIRECTORY": "",
+        "READY_OUTPUT_DIRECTORY": "",
+        "CLEAN_TXT_OUTPUT_DIRECTORY": "",
     }
     if os.path.exists("config.txt"):
         try:
@@ -64,12 +67,30 @@ def save_config(config):
 
 # Initialize variables from config
 config = load_config()
-FOLDER_PATH = config.get("DEFAULT_DIRECTORY", "")
-if not FOLDER_PATH:
-    FOLDER_PATH = os.path.expanduser("~/Texte")
+INPUT_FOLDER = config.get("INPUT_DIRECTORY", "") or config.get("DEFAULT_DIRECTORY", "")
+if not INPUT_FOLDER:
+    INPUT_FOLDER = os.path.expanduser("~/Texte")
 
-FOLDER_PATH2 = os.path.join(FOLDER_PATH, "NoYoutubeLink")
-name = config.get("DEFAULT_DIRECTORY", "")
+def default_output_paths(input_folder):
+    parent_folder = os.path.dirname(os.path.normpath(input_folder))
+    return (
+        os.path.join(parent_folder, "Ultrastar Songs Output"),
+        os.path.join(parent_folder, "Clean TXT Output"),
+    )
+
+def folder_summary(input_folder, ready_output_folder, clean_txt_output_folder):
+    return (
+        f"Input: {input_folder}\n"
+        f"Ready: {ready_output_folder}\n"
+        f"Clean TXT: {clean_txt_output_folder}"
+    )
+
+DEFAULT_READY_OUTPUT, DEFAULT_CLEAN_TXT_OUTPUT = default_output_paths(INPUT_FOLDER)
+READY_OUTPUT_FOLDER = config.get("READY_OUTPUT_DIRECTORY", "") or DEFAULT_READY_OUTPUT
+CLEAN_TXT_OUTPUT_FOLDER = config.get("CLEAN_TXT_OUTPUT_DIRECTORY", "") or DEFAULT_CLEAN_TXT_OUTPUT
+FOLDER_PATH = INPUT_FOLDER
+FOLDER_PATH2 = os.path.join(INPUT_FOLDER, "NoYoutubeLink")
+name = INPUT_FOLDER
 start = 0
 execute = 0
 
@@ -91,6 +112,8 @@ def busy(madeprogress):
     if madeprogress is not None and progress < madeprogress:
         progress = madeprogress
     file_open_button.configure(state="disabled", fg_color="#313244", text_color="#7F849C")
+    ready_output_button.configure(state="disabled", fg_color="#313244", text_color="#7F849C")
+    clean_txt_output_button.configure(state="disabled", fg_color="#313244", text_color="#7F849C")
     refresh_folder_button.configure(state="disabled", fg_color="#313244", text_color="#7F849C")
     thread_entry_label2.configure(state="disabled", fg_color="#313244", text_color="#7F849C")
     for button in buttons:
@@ -101,6 +124,8 @@ def busy(madeprogress):
 
 def unbusy():
     file_open_button.configure(state="normal", fg_color="#89B4FA", text_color="#11111B")
+    ready_output_button.configure(state="normal", fg_color="#89B4FA", text_color="#11111B")
+    clean_txt_output_button.configure(state="normal", fg_color="#89B4FA", text_color="#11111B")
     refresh_folder_button.configure(state="normal", fg_color="#74C7EC", text_color="#11111B")
     thread_entry_label2.configure(state="normal", fg_color="#45475A", text_color="#CDD6F4")
     
@@ -168,25 +193,63 @@ def changethreads():
         sleep(1.5)
         thread_entry_label2.configure(text="Change", fg_color="#45475A")
 
+def folders_are_valid(input_folder, ready_output_folder, clean_txt_output_folder):
+    paths = [input_folder, ready_output_folder, clean_txt_output_folder]
+    normalized_paths = [os.path.realpath(os.path.abspath(path)) for path in paths if path]
+    return len(normalized_paths) == 3 and len(set(normalized_paths)) == 3
+
+def save_folder_config():
+    cfg = load_config()
+    cfg["DEFAULT_DIRECTORY"] = FOLDER_PATH
+    cfg["INPUT_DIRECTORY"] = FOLDER_PATH
+    cfg["READY_OUTPUT_DIRECTORY"] = READY_OUTPUT_FOLDER
+    cfg["CLEAN_TXT_OUTPUT_DIRECTORY"] = CLEAN_TXT_OUTPUT_FOLDER
+    save_config(cfg)
+
+def update_folder_display():
+    path_label.configure(
+        text=folder_summary(
+            FOLDER_PATH,
+            READY_OUTPUT_FOLDER,
+            CLEAN_TXT_OUTPUT_FOLDER,
+        )
+    )
+
+def select_folder(folder_type):
+    global FOLDER_PATH, FOLDER_PATH2, READY_OUTPUT_FOLDER, CLEAN_TXT_OUTPUT_FOLDER, name, progress
+    selected_folder = fd.askdirectory()
+    if not selected_folder:
+        return
+
+    new_input_folder = selected_folder if folder_type == "input" else FOLDER_PATH
+    new_ready_output_folder = selected_folder if folder_type == "ready" else READY_OUTPUT_FOLDER
+    new_clean_txt_output_folder = selected_folder if folder_type == "clean" else CLEAN_TXT_OUTPUT_FOLDER
+
+    if not folders_are_valid(
+        new_input_folder,
+        new_ready_output_folder,
+        new_clean_txt_output_folder,
+    ):
+        messagebox.showerror(
+            "Invalid folder selection",
+            "Input, ready-output, and clean-TXT folders must be different.",
+        )
+        return
+
+    FOLDER_PATH = new_input_folder
+    FOLDER_PATH2 = os.path.join(FOLDER_PATH, "NoYoutubeLink")
+    READY_OUTPUT_FOLDER = new_ready_output_folder
+    CLEAN_TXT_OUTPUT_FOLDER = new_clean_txt_output_folder
+    name = FOLDER_PATH
+    progress = 0
+    save_folder_config()
+    update_folder_display()
+    refresh_search_results()
+
 def callback():
-    global FOLDER_PATH, FOLDER_PATH2, start, name, progress
+    global FOLDER_PATH, FOLDER_PATH2, READY_OUTPUT_FOLDER, CLEAN_TXT_OUTPUT_FOLDER, start, name, progress
     if start == 0:
-        newname = fd.askdirectory()
-        if newname:
-            name = newname
-            progress = 0
-            busy(None)
-            unbusy()
-            path_label.configure(text=name)
-            FOLDER_PATH = name
-            FOLDER_PATH2 = os.path.join(name, "NoYoutubeLink")
-            
-            # Save updated directory to config
-            cfg = load_config()
-            cfg["DEFAULT_DIRECTORY"] = name
-            save_config(cfg)
-            
-            refresh_search_results()
+        select_folder("input")
 
 def programm():
     refresh_search_results()
@@ -228,7 +291,13 @@ def programm2():
     if start == 0 and name and progress >= 2:
         busy(3)
         try:
-            run_ultrastar_downloader(FOLDER_PATH, prefix_list1, number_of_threads)
+            run_ultrastar_downloader(
+                FOLDER_PATH,
+                READY_OUTPUT_FOLDER,
+                CLEAN_TXT_OUTPUT_FOLDER,
+                prefix_list1,
+                number_of_threads,
+            )
         except Exception as e:
             eisbxrerror(e)
             return
@@ -263,7 +332,13 @@ def programmall():
         start_button_label_all.configure(text="Downloading Videos")
         root.update_idletasks()
         try:
-            run_ultrastar_downloader(FOLDER_PATH, prefix_list1, number_of_threads)
+            run_ultrastar_downloader(
+                FOLDER_PATH,
+                READY_OUTPUT_FOLDER,
+                CLEAN_TXT_OUTPUT_FOLDER,
+                prefix_list1,
+                number_of_threads,
+            )
         except Exception as e:
             eisbxrerror(e)
             return
@@ -382,7 +457,7 @@ dir_frame.columnconfigure(0, weight=1)
 
 file_open_button = ctk.CTkButton(
     dir_frame, 
-    text="Select Songs Folder", 
+    text="Select Input Folder",
     command=callback, 
     font=ctk.CTkFont(family="Inter", size=14, weight="bold"),
     fg_color="#89B4FA",
@@ -391,6 +466,30 @@ file_open_button = ctk.CTkButton(
     height=40
 )
 file_open_button.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+
+ready_output_button = ctk.CTkButton(
+    dir_frame,
+    text="Select Ready Output Folder",
+    command=lambda: select_folder("ready"),
+    font=ctk.CTkFont(family="Inter", size=13, weight="bold"),
+    fg_color="#89B4FA",
+    text_color="#11111B",
+    hover_color="#B4BEFE",
+    height=34
+)
+ready_output_button.grid(row=1, column=0, sticky="ew", pady=(0, 6))
+
+clean_txt_output_button = ctk.CTkButton(
+    dir_frame,
+    text="Select Clean TXT Output Folder",
+    command=lambda: select_folder("clean"),
+    font=ctk.CTkFont(family="Inter", size=13, weight="bold"),
+    fg_color="#89B4FA",
+    text_color="#11111B",
+    hover_color="#B4BEFE",
+    height=34
+)
+clean_txt_output_button.grid(row=2, column=0, sticky="ew", pady=(0, 6))
 
 refresh_folder_button = ctk.CTkButton(
     dir_frame,
@@ -402,17 +501,18 @@ refresh_folder_button = ctk.CTkButton(
     hover_color="#89DCEB",
     height=34
 )
-refresh_folder_button.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+refresh_folder_button.grid(row=3, column=0, sticky="ew", pady=(0, 8))
 
 path_label = ctk.CTkLabel(
     dir_frame, 
-    text=name if name else "No folder selected", 
+    text=folder_summary(FOLDER_PATH, READY_OUTPUT_FOLDER, CLEAN_TXT_OUTPUT_FOLDER)
+    if name else "No folder selected",
     font=ctk.CTkFont(family="Inter", size=12), 
     text_color="#CDD6F4", 
     wraplength=300, 
     anchor="w"
 )
-path_label.grid(row=2, column=0, sticky="ew", padx=5)
+path_label.grid(row=4, column=0, sticky="ew", padx=5)
 
 # Row 3: Thread Controller Frame
 thread_frame = ctk.CTkFrame(sidebar_frame, fg_color="transparent")

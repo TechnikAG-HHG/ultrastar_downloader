@@ -1,11 +1,16 @@
 # ultrastar_downloader
+
 A tool to download the song and image data to an UltraStar Deluxe text file.
 
-
 # How to use
+
 1. Download UltraStar Deluxe text files from: https://usdb.animux.de/ or https://usdb.eu/ .
 
-2. Move them all into one folder.
+2. Select an input folder and place the UltraStar `.txt` files to process there. Select the ready-output and clean-TXT output folders separately in the application.
+
+    The program creates two sibling folders automatically:
+    - `Ultrastar Songs Output` contains the edited TXT files and downloaded video, audio, and cover files.
+    - `Clean TXT Output` contains the original, unedited TXT files after successful processing.
 
 3. Run ultrastar_main.py, select your songs folder, and click **Refresh Songs** to verify detected .txt files.
 
@@ -14,11 +19,11 @@ A tool to download the song and image data to an UltraStar Deluxe text file.
 5. Copy everything into your UltraStar Deluxe song folder.
 
 # How it works:
+
 1. The programm extracts the link and downloads the video from Youtube. This can be through the supplied link or through a YouTube search.
 
 2. It tries to download a picture to the video as a Cover.
-  
+
 3. It renames the downloaded files and it adds the names of them in the text file.
 
-
-Important: You can use the Downloader only once on the same txt file because we need to delete the line with the YT Link for UltraStar when we paste in the name of the mp4 file
+The input TXT is moved to `Clean TXT Output` only after the download and edited output TXT have completed successfully. Failed downloads remain in the input folder so they can be retried.
