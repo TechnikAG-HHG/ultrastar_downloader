@@ -5,9 +5,9 @@ A tool to download the song and image data to an UltraStar Deluxe text file.
 # How to use
 1. Download UltraStar Deluxe text files from: https://usdb.animux.de/ or https://usdb.eu/ .
 
-2. Move them all into a folder and in ultrastar_main.py change the FOLDER_PATH.
+2. Move them all into one folder.
 
-3. Run ultrastar_main.py and wait a bit.
+3. Run ultrastar_main.py, select your songs folder, and click **Refresh Songs** to verify detected .txt files.
 
 4. For text files without a youtube link it searches for the right video. If the video is too long because it is a music video it uses the second result. Check these files because it can be that in the text files you have to set #GAP: to 0 or the video is just not right.
 
